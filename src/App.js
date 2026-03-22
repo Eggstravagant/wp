@@ -16,6 +16,9 @@ import {
   onSnapshot,
   deleteDoc,
   addDoc,
+  updateDoc,
+  getDocs,
+  serverTimestamp,
 } from "firebase/firestore";
 import {
   BrowserRouter,
@@ -35,6 +38,8 @@ const firebaseConfig = {
   appId: "1:934292031983:web:4dd14d66c1b2d936ea4e1a",
   measurementId: "G-TZ1VQWWSPY",
 };
+
+const ADMIN_EMAIL = "wakeproductive@gmail.com";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -60,6 +65,19 @@ function sameProfile(a, b) {
     !!a?.darkMode === !!b?.darkMode &&
     (a?.email || "") === (b?.email || "")
   );
+}
+
+function formatEventDate(value) {
+  if (!value) return "No date set";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString([], {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 function SectionCard({ title, text, darkMode = true, accent = "#22C55E", children }) {
@@ -314,12 +332,7 @@ function HomePage() {
             </div>
           </div>
 
-          <div
-            style={{
-              display: "grid",
-              gap: 16,
-            }}
-          >
+          <div style={{ display: "grid", gap: 16 }}>
             <SectionCard
               title="Our main goals"
               text="WakeOak exists to organize local good into something visible, trackable, and inspiring. We want volunteering to feel simple, social, and worth showing up for — whether that means helping clean public spaces, supporting students, or serving neighbors who need extra care."
@@ -945,9 +958,207 @@ function SettingsModal({
   );
 }
 
+function EventEditorModal({
+  open,
+  onClose,
+  form,
+  setForm,
+  onSubmit,
+  isSaving,
+  darkMode,
+  isEditing,
+}) {
+  if (!open) return null;
+
+  const panelBg = darkMode ? "#111827" : "white";
+  const text = darkMode ? "#F9FAFB" : "#111827";
+  const muted = darkMode ? "#CBD5E1" : "#6B7280";
+  const border = darkMode ? "#374151" : "#D1D5DB";
+  const inputBg = darkMode ? "#0F172A" : "#F9FAFB";
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.55)",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          zIndex: 1100,
+          padding: 20,
+        }}
+      >
+        <motion.div
+          initial={{ scale: 0.95, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.95, opacity: 0 }}
+          style={{
+            width: "100%",
+            maxWidth: 620,
+            background: panelBg,
+            color: text,
+            border: `1px solid ${border}`,
+            borderRadius: 24,
+            padding: 24,
+            boxShadow: "0 24px 60px rgba(0,0,0,0.35)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: 28 }}>{isEditing ? "Edit Event" : "Create Event"}</h2>
+              <p style={{ margin: "6px 0 0 0", color: muted }}>
+                This will appear in every user’s events section.
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              disabled={isSaving}
+              style={{
+                border: "none",
+                background: "transparent",
+                color: text,
+                fontSize: 22,
+                cursor: isSaving ? "not-allowed" : "pointer",
+                opacity: isSaving ? 0.6 : 1,
+              }}
+            >
+              ✕
+            </button>
+          </div>
+
+          <div style={{ display: "grid", gap: 14 }}>
+            <div>
+              <label style={{ display: "block", marginBottom: 8 }}>Event title</label>
+              <input
+                value={form.title}
+                onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+                placeholder="Volunteering at PinesWood!!"
+                style={{
+                  width: "100%",
+                  padding: 12,
+                  borderRadius: 12,
+                  border: `1px solid ${border}`,
+                  background: inputBg,
+                  color: text,
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: "block", marginBottom: 8 }}>Address</label>
+              <input
+                value={form.address}
+                onChange={(e) => setForm((prev) => ({ ...prev, address: e.target.value }))}
+                placeholder="Pineswood, 12398492184"
+                style={{
+                  width: "100%",
+                  padding: 12,
+                  borderRadius: 12,
+                  border: `1px solid ${border}`,
+                  background: inputBg,
+                  color: text,
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: "block", marginBottom: 8 }}>Description</label>
+              <textarea
+                value={form.description}
+                onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+                placeholder="We are volunteering at the shelter today guys"
+                rows={4}
+                style={{
+                  width: "100%",
+                  padding: 12,
+                  borderRadius: 12,
+                  border: `1px solid ${border}`,
+                  background: inputBg,
+                  color: text,
+                  outline: "none",
+                  boxSizing: "border-box",
+                  resize: "vertical",
+                }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: "block", marginBottom: 8 }}>Date and time</label>
+              <input
+                type="datetime-local"
+                value={form.date}
+                onChange={(e) => setForm((prev) => ({ ...prev, date: e.target.value }))}
+                style={{
+                  width: "100%",
+                  padding: 12,
+                  borderRadius: 12,
+                  border: `1px solid ${border}`,
+                  background: inputBg,
+                  color: text,
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={onClose}
+              disabled={isSaving}
+              style={{
+                padding: "12px 16px",
+                borderRadius: 12,
+                border: `1px solid ${border}`,
+                background: "transparent",
+                color: text,
+                fontWeight: 700,
+                cursor: isSaving ? "not-allowed" : "pointer",
+              }}
+            >
+              Cancel
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={onSubmit}
+              disabled={isSaving}
+              style={{
+                padding: "12px 18px",
+                borderRadius: 12,
+                border: "none",
+                background: "linear-gradient(135deg, #22C55E, #15803D)",
+                color: "white",
+                fontWeight: 800,
+                cursor: isSaving ? "not-allowed" : "pointer",
+                opacity: isSaving ? 0.7 : 1,
+              }}
+            >
+              {isSaving ? "Saving..." : isEditing ? "Save Changes" : "Send Event"}
+            </motion.button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
 function Dashboard() {
   const [uid, setUid] = useState("");
+  const [currentEmail, setCurrentEmail] = useState("");
   const [tasks, setTasks] = useState([]);
+  const [events, setEvents] = useState([]);
   const [title, setTitle] = useState("");
   const [points, setPoints] = useState(0);
   const [profile, setProfile] = useState(
@@ -977,29 +1188,45 @@ function Dashboard() {
   const [error, setError] = useState("");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [isSavingEvent, setIsSavingEvent] = useState(false);
+  const [eventModalOpen, setEventModalOpen] = useState(false);
+  const [editingEventId, setEditingEventId] = useState("");
+  const [eventForm, setEventForm] = useState({
+    title: "",
+    address: "",
+    description: "",
+    date: "",
+  });
   const unsubscribeUserDocRef = useRef(null);
   const unsubscribeTasksRef = useRef(null);
+  const unsubscribeEventsRef = useRef(null);
   const navigate = useNavigate();
 
+  const isAdmin = currentEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase();
   const effectiveDarkMode = settingsOpen ? settingsDraft.darkMode : profile.darkMode;
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         setUid("");
+        setCurrentEmail("");
         setTasks([]);
+        setEvents([]);
         setProfileLoaded(false);
         if (unsubscribeUserDocRef.current) unsubscribeUserDocRef.current();
         if (unsubscribeTasksRef.current) unsubscribeTasksRef.current();
+        if (unsubscribeEventsRef.current) unsubscribeEventsRef.current();
         navigate("/");
         return;
       }
 
       setUid(user.uid);
+      setCurrentEmail(user.email || "");
       setError("");
 
       const userRef = doc(db, "users", user.uid);
       const tasksRef = collection(db, "users", user.uid, "tasks");
+      const eventsRef = collection(db, "events");
 
       try {
         const snap = await getDoc(userRef);
@@ -1056,6 +1283,7 @@ function Dashboard() {
               arr.push(data);
               if (data.completed) total += Number(data.reward || 0);
             });
+            arr.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
             setTasks(arr);
             setPoints(total);
             await setDoc(
@@ -1070,6 +1298,27 @@ function Dashboard() {
             setError(err.message || "Could not load tasks");
           }
         );
+
+        if (unsubscribeEventsRef.current) unsubscribeEventsRef.current();
+        unsubscribeEventsRef.current = onSnapshot(
+          eventsRef,
+          (eventSnap) => {
+            const arr = [];
+            eventSnap.forEach((d) => {
+              const data = { id: d.id, ...d.data() };
+              if (data.active !== false) arr.push(data);
+            });
+            arr.sort((a, b) => {
+              const aDate = new Date(a.date || 0).getTime();
+              const bDate = new Date(b.date || 0).getTime();
+              return aDate - bDate;
+            });
+            setEvents(arr);
+          },
+          (err) => {
+            setError(err.message || "Could not load events");
+          }
+        );
       } catch (err) {
         setError(err.message || "Could not load dashboard");
       }
@@ -1079,6 +1328,7 @@ function Dashboard() {
       unsubscribeAuth();
       if (unsubscribeUserDocRef.current) unsubscribeUserDocRef.current();
       if (unsubscribeTasksRef.current) unsubscribeTasksRef.current();
+      if (unsubscribeEventsRef.current) unsubscribeEventsRef.current();
     };
   }, [navigate, settingsOpen]);
 
@@ -1131,6 +1381,7 @@ function Dashboard() {
         title: title.trim(),
         completed: false,
         reward: 10,
+        type: "manual",
         createdAt: Date.now(),
       });
       setTitle("");
@@ -1196,8 +1447,143 @@ function Dashboard() {
     }
   }
 
+  function resetEventForm() {
+    setEventForm({
+      title: "",
+      address: "",
+      description: "",
+      date: "",
+    });
+    setEditingEventId("");
+  }
+
+  function openCreateEventModal() {
+    resetEventForm();
+    setEventModalOpen(true);
+  }
+
+  function openEditEventModal(event) {
+    setEditingEventId(event.id);
+    setEventForm({
+      title: event.title || "",
+      address: event.address || "",
+      description: event.description || "",
+      date: event.date || "",
+    });
+    setEventModalOpen(true);
+  }
+
+  function closeEventModal() {
+    if (isSavingEvent) return;
+    setEventModalOpen(false);
+    resetEventForm();
+  }
+
+  async function submitEvent() {
+    if (!isAdmin) return;
+    if (!eventForm.title.trim() || !eventForm.address.trim() || !eventForm.description.trim() || !eventForm.date) {
+      setError("Please fill in all event fields");
+      return;
+    }
+
+    setError("");
+    setIsSavingEvent(true);
+
+    const payload = {
+      title: eventForm.title.trim(),
+      address: eventForm.address.trim(),
+      description: eventForm.description.trim(),
+      date: eventForm.date,
+      reward: 100,
+      active: true,
+      updatedAt: Date.now(),
+      updatedBy: currentEmail,
+    };
+
+    try {
+      if (editingEventId) {
+        await updateDoc(doc(db, "events", editingEventId), payload);
+      } else {
+        await addDoc(collection(db, "events"), {
+          ...payload,
+          createdAt: Date.now(),
+          createdBy: currentEmail,
+          createdAtServer: serverTimestamp(),
+        });
+      }
+      closeEventModal();
+    } catch (err) {
+      setError(err.message || "Could not save event");
+    } finally {
+      setIsSavingEvent(false);
+    }
+  }
+
+  async function deleteEventEverywhere(event) {
+    if (!isAdmin) return;
+    setError("");
+    try {
+      await deleteDoc(doc(db, "events", event.id));
+
+      const usersSnap = await getDocs(collection(db, "users"));
+      const deletionPromises = [];
+
+      usersSnap.forEach((userDoc) => {
+        const tasksRef = collection(db, "users", userDoc.id, "tasks");
+        deletionPromises.push(
+          getDocs(tasksRef).then((taskSnap) => {
+            const taskDeletes = [];
+            taskSnap.forEach((taskDoc) => {
+              const taskData = taskDoc.data();
+              if (taskData.type === "event" && taskData.eventId === event.id) {
+                taskDeletes.push(deleteDoc(doc(db, "users", userDoc.id, "tasks", taskDoc.id)));
+              }
+            });
+            return Promise.all(taskDeletes);
+          })
+        );
+      });
+
+      await Promise.all(deletionPromises);
+    } catch (err) {
+      setError(err.message || "Could not remove event");
+    }
+  }
+
+  async function signupForEvent(event) {
+    if (!uid) return;
+    setError("");
+
+    const alreadyRegistered = tasks.some(
+      (task) => task.type === "event" && task.eventId === event.id
+    );
+
+    if (alreadyRegistered) {
+      setError("You already signed up for this event");
+      return;
+    }
+
+    try {
+      await addDoc(collection(db, "users", uid, "tasks"), {
+        title: `Attend event: ${event.title}`,
+        completed: false,
+        reward: event.reward || 100,
+        type: "event",
+        eventId: event.id,
+        registeredAt: Date.now(),
+        createdAt: Date.now(),
+      });
+    } catch (err) {
+      setError(err.message || "Could not register for event");
+    }
+  }
+
   const cards = useMemo(() => {
     const completedTasks = tasks.filter((task) => task.completed).length;
+    const unsignedEvents = events.filter(
+      (event) => !tasks.some((task) => task.type === "event" && task.eventId === event.id)
+    );
+
     return [
       {
         id: "first-task",
@@ -1220,8 +1606,15 @@ function Dashboard() {
         reward: 75,
         show: completedTasks > 0 && completedTasks < 3,
       },
+      {
+        id: "join-event",
+        title: "Join a community event",
+        subtitle: "Sign up for a WakeOak event and earn 100 points when you complete it.",
+        reward: 100,
+        show: unsignedEvents.length > 0,
+      },
     ].filter((card) => card.show && !dismissedCards.includes(card.id));
-  }, [tasks, dismissedCards]);
+  }, [tasks, dismissedCards, events]);
 
   const pageBg = effectiveDarkMode ? "#111827" : "#F5F1EE";
   const cardBg = effectiveDarkMode ? "#1F2937" : "white";
@@ -1260,7 +1653,7 @@ function Dashboard() {
     >
       <div
         style={{
-          maxWidth: 720,
+          maxWidth: 1100,
           margin: "0 auto",
           padding: 20,
           fontFamily: "Inter, sans-serif",
@@ -1276,13 +1669,18 @@ function Dashboard() {
           }}
         >
           <div>
-            <h1 style={{ color: textColor, marginBottom: 6 }}>Your Tasks</h1>
+            <h1 style={{ color: textColor, marginBottom: 6 }}>Your Dashboard</h1>
             <p style={{ margin: 0, color: mutedText, fontSize: 18 }}>
               Welcome, <strong>{profile.name} {profile.lastName}</strong>
             </p>
+            {isAdmin && (
+              <p style={{ margin: "8px 0 0 0", color: "#86EFAC", fontWeight: 700 }}>
+                Admin access enabled for {ADMIN_EMAIL}
+              </p>
+            )}
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <p style={{ fontSize: 18, margin: 0 }}>
               Points: <strong>{points}</strong>
             </p>
@@ -1415,107 +1813,329 @@ function Dashboard() {
           )}
         </AnimatePresence>
 
-        <div style={{ display: "flex", gap: 8, marginTop: 24 }}>
-          <input
+        {isAdmin && (
+          <div
             style={{
-              flex: 1,
-              padding: 12,
-              borderRadius: 8,
+              marginTop: 24,
+              background: effectiveDarkMode ? "linear-gradient(135deg, #0F172A, #111827)" : "white",
               border: `1px solid ${borderColor}`,
-              background: inputBg,
-              color: textColor,
-              outline: "none",
+              borderRadius: 20,
+              padding: 20,
+              boxShadow: "0 12px 30px rgba(0,0,0,0.08)",
             }}
-            placeholder="Add a task"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            style={{
-              padding: 12,
-              background: "#16A34A",
-              color: "white",
-              border: "none",
-              borderRadius: 8,
-              cursor: "pointer",
-            }}
-            onClick={addTask}
           >
-            Add
-          </motion.button>
-        </div>
-
-        <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 12 }}>
-          <AnimatePresence>
-            {tasks.map((task) => (
-              <motion.div
-                key={task.id}
-                initial={{ opacity: 0, x: -50 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 50 }}
-                transition={{ duration: 0.3 }}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+              <div>
+                <p style={{ margin: 0, color: "#86EFAC", fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, fontSize: 12 }}>
+                  Admin event center
+                </p>
+                <h2 style={{ margin: "8px 0 6px 0" }}>Send events to everyone</h2>
+                <p style={{ margin: 0, color: mutedText }}>
+                  Create, edit, and remove global events from every user dashboard.
+                </p>
+              </div>
+              <motion.button
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={openCreateEventModal}
                 style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: 12,
-                  borderRadius: 10,
-                  background: cardBg,
-                  border: `1px solid ${borderColor}`,
+                  padding: "12px 16px",
+                  borderRadius: 12,
+                  border: "none",
+                  background: "linear-gradient(135deg, #22C55E, #15803D)",
+                  color: "white",
+                  fontWeight: 800,
+                  cursor: "pointer",
                 }}
               >
-                <div>
-                  <span
-                    style={{
-                      display: "block",
-                      textDecoration: task.completed ? "line-through" : "none",
-                      color: textColor,
-                      fontWeight: 600,
-                    }}
-                  >
-                    {task.title}
-                  </span>
-                  <span style={{ fontSize: 13, color: mutedText }}>
-                    Reward: {task.reward} points
-                  </span>
+                Create Event
+              </motion.button>
+            </div>
+          </div>
+        )}
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1.1fr 0.9fr",
+            gap: 20,
+            marginTop: 24,
+            alignItems: "start",
+          }}
+        >
+          <div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+              <input
+                style={{
+                  flex: 1,
+                  padding: 12,
+                  borderRadius: 8,
+                  border: `1px solid ${borderColor}`,
+                  background: inputBg,
+                  color: textColor,
+                  outline: "none",
+                }}
+                placeholder="Add a task"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                style={{
+                  padding: 12,
+                  background: "#16A34A",
+                  color: "white",
+                  border: "none",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                }}
+                onClick={addTask}
+              >
+                Add
+              </motion.button>
+            </div>
+
+            <div
+              style={{
+                background: cardBg,
+                border: `1px solid ${borderColor}`,
+                borderRadius: 18,
+                padding: 18,
+              }}
+            >
+              <h2 style={{ marginTop: 0, marginBottom: 14 }}>Tasks</h2>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <AnimatePresence>
+                  {tasks.length === 0 && (
+                    <div
+                      style={{
+                        padding: 16,
+                        borderRadius: 12,
+                        background: softBg,
+                        color: mutedText,
+                      }}
+                    >
+                      No tasks yet. Add one or sign up for an event.
+                    </div>
+                  )}
+
+                  {tasks.map((task) => {
+                    const isEvent = task.type === "event";
+                    const liveEvent = isEvent ? events.find((e) => e.id === task.eventId) : null;
+                    
+                    const displayTitle = liveEvent ? `Attend: ${liveEvent.title}` : task.title;
+                    const displayDate = liveEvent ? liveEvent.date : task.eventDate;
+
+                    return (
+                      <motion.div
+                        key={task.id}
+                        initial={{ opacity: 0, x: -50 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 50 }}
+                        transition={{ duration: 0.3 }}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          padding: 12,
+                          borderRadius: 12,
+                          background: effectiveDarkMode ? "#0F172A" : "#FAFAFA",
+                          border: `1px solid ${borderColor}`,
+                          gap: 12,
+                        }}
+                      >
+                        <div>
+                          <span
+                            style={{
+                              display: "block",
+                              textDecoration: task.completed ? "line-through" : "none",
+                              color: textColor,
+                              fontWeight: 700,
+                            }}
+                          >
+                            {displayTitle}
+                          </span>
+                          <span style={{ fontSize: 13, color: mutedText }}>
+                            Reward: {task.reward} points
+                          </span>
+                          {isEvent && displayDate && (
+                            <div style={{ marginTop: 6, fontSize: 13, color: "#86EFAC" }}>
+                              Event signup • {formatEventDate(displayDate)}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            style={{
+                              padding: "6px 10px",
+                              background: "#15803D",
+                              color: "white",
+                              border: "none",
+                              borderRadius: 6,
+                              cursor: "pointer",
+                            }}
+                            onClick={() => toggleComplete(task)}
+                          >
+                            {task.completed ? "Undo" : "Done"}
+                          </motion.button>
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            style={{
+                              padding: "6px 10px",
+                              background: softBg,
+                              color: textColor,
+                              border: `1px solid ${borderColor}`,
+                              borderRadius: 6,
+                              cursor: "pointer",
+                            }}
+                            onClick={() => removeTask(task)}
+                          >
+                            ✕
+                          </motion.button>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div
+              style={{
+                background: cardBg,
+                border: `1px solid ${borderColor}`,
+                borderRadius: 18,
+                padding: 18,
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
+                <h2 style={{ margin: 0 }}>Events</h2>
+                <div style={{ color: mutedText, fontSize: 14 }}>
+                  Community opportunities worth 100 points
                 </div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {events.length === 0 && (
+                  <div
                     style={{
-                      padding: "6px 10px",
-                      background: "#15803D",
-                      color: "white",
-                      border: "none",
-                      borderRadius: 6,
-                      cursor: "pointer",
-                    }}
-                    onClick={() => toggleComplete(task)}
-                  >
-                    {task.completed ? "Undo" : "Done"}
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    style={{
-                      padding: "6px 10px",
+                      padding: 16,
+                      borderRadius: 12,
                       background: softBg,
-                      color: textColor,
-                      border: `1px solid ${borderColor}`,
-                      borderRadius: 6,
-                      cursor: "pointer",
+                      color: mutedText,
                     }}
-                    onClick={() => removeTask(task)}
                   >
-                    ✕
-                  </motion.button>
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
+                    No events posted yet.
+                  </div>
+                )}
+
+                {events.map((event) => {
+                  const alreadyRegistered = tasks.some(
+                    (task) => task.type === "event" && task.eventId === event.id
+                  );
+
+                  return (
+                    <motion.div
+                      key={event.id}
+                      initial={{ opacity: 0, y: 16 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      style={{
+                        borderRadius: 16,
+                        padding: 16,
+                        background: effectiveDarkMode
+                          ? "linear-gradient(135deg, #1E293B, #0F172A)"
+                          : "linear-gradient(135deg, #F8FAFC, #EEF2FF)",
+                        border: `1px solid ${effectiveDarkMode ? "#334155" : "#DDE5F4"}`,
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+                        <div>
+                          <h3 style={{ margin: "0 0 8px 0", fontSize: 22 }}>{event.title}</h3>
+                          <p style={{ margin: "0 0 8px 0", color: mutedText, lineHeight: 1.6 }}>
+                            {event.description}
+                          </p>
+                          <div style={{ display: "grid", gap: 6, fontSize: 14, color: mutedText }}>
+                            <div>
+                              <strong style={{ color: textColor }}>Address:</strong> {event.address}
+                            </div>
+                            <div>
+                              <strong style={{ color: textColor }}>Date:</strong> {formatEventDate(event.date)}
+                            </div>
+                            <div>
+                              <strong style={{ color: textColor }}>Reward:</strong> {event.reward || 100} points
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 140 }}>
+                          <motion.button
+                            whileHover={{ scale: alreadyRegistered ? 1 : 1.04 }}
+                            whileTap={{ scale: alreadyRegistered ? 1 : 0.97 }}
+                            onClick={() => signupForEvent(event)}
+                            disabled={alreadyRegistered}
+                            style={{
+                              padding: "10px 14px",
+                              borderRadius: 10,
+                              border: "none",
+                              background: alreadyRegistered ? "#475569" : "linear-gradient(135deg, #22C55E, #15803D)",
+                              color: "white",
+                              fontWeight: 800,
+                              cursor: alreadyRegistered ? "not-allowed" : "pointer",
+                              opacity: alreadyRegistered ? 0.8 : 1,
+                            }}
+                          >
+                            {alreadyRegistered ? "Registered" : "Sign Up"}
+                          </motion.button>
+
+                          {isAdmin && (
+                            <>
+                              <motion.button
+                                whileHover={{ scale: 1.04 }}
+                                whileTap={{ scale: 0.97 }}
+                                onClick={() => openEditEventModal(event)}
+                                style={{
+                                  padding: "10px 14px",
+                                  borderRadius: 10,
+                                  border: `1px solid ${borderColor}`,
+                                  background: softBg,
+                                  color: textColor,
+                                  fontWeight: 700,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                Edit
+                              </motion.button>
+                              <motion.button
+                                whileHover={{ scale: 1.04 }}
+                                whileTap={{ scale: 0.97 }}
+                                onClick={() => deleteEventEverywhere(event)}
+                                style={{
+                                  padding: "10px 14px",
+                                  borderRadius: 10,
+                                  border: "1px solid #7F1D1D",
+                                  background: effectiveDarkMode ? "#3F1D1D" : "#FEE2E2",
+                                  color: effectiveDarkMode ? "#FECACA" : "#991B1B",
+                                  fontWeight: 700,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                Remove
+                              </motion.button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1527,6 +2147,17 @@ function Dashboard() {
         saveStatus={saveStatus}
         darkMode={effectiveDarkMode}
         isSavingSettings={isSavingSettings}
+      />
+
+      <EventEditorModal
+        open={eventModalOpen}
+        onClose={closeEventModal}
+        form={eventForm}
+        setForm={setEventForm}
+        onSubmit={submitEvent}
+        isSaving={isSavingEvent}
+        darkMode={effectiveDarkMode}
+        isEditing={!!editingEventId}
       />
     </div>
   );
