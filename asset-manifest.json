@@ -1,15 +1,15 @@
 {
   "files": {
     "main.css": "/wp/static/css/main.e6c13ad2.css",
-    "main.js": "/wp/static/js/main.85ee3edc.js",
+    "main.js": "/wp/static/js/main.ed0b459c.js",
     "static/js/453.1e3e533d.chunk.js": "/wp/static/js/453.1e3e533d.chunk.js",
     "index.html": "/wp/index.html",
     "main.e6c13ad2.css.map": "/wp/static/css/main.e6c13ad2.css.map",
-    "main.85ee3edc.js.map": "/wp/static/js/main.85ee3edc.js.map",
+    "main.ed0b459c.js.map": "/wp/static/js/main.ed0b459c.js.map",
     "453.1e3e533d.chunk.js.map": "/wp/static/js/453.1e3e533d.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.e6c13ad2.css",
-    "static/js/main.85ee3edc.js"
+    "static/js/main.ed0b459c.js"
   ]
 }
