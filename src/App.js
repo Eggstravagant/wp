@@ -6,6 +6,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  updatePassword,
 } from "firebase/auth";
 import {
   getFirestore,
@@ -773,6 +774,10 @@ function SettingsModal({
   saveStatus,
   darkMode,
   isSavingSettings,
+  newPassword,
+  setNewPassword,
+  onUpdatePassword,
+  passwordMessage,
 }) {
   if (!open) return null;
 
@@ -812,6 +817,8 @@ function SettingsModal({
             borderRadius: 20,
             padding: 24,
             boxShadow: "0 24px 60px rgba(0,0,0,0.25)",
+            maxHeight: "90vh",
+            overflowY: "auto",
           }}
         >
           <div
@@ -825,7 +832,7 @@ function SettingsModal({
             <div>
               <h2 style={{ margin: 0, fontSize: 28 }}>Settings</h2>
               <p style={{ margin: "6px 0 0 0", color: muted }}>
-                Changes save when you close this menu
+                Profile changes save when you close this menu
               </p>
             </div>
             <button
@@ -946,6 +953,51 @@ function SettingsModal({
                 onChange={(value) => setProfile((prev) => ({ ...prev, darkMode: value }))}
                 darkMode={darkMode}
               />
+            </div>
+
+            <div style={{ marginTop: 10, paddingTop: 20, borderTop: `1px solid ${border}` }}>
+              <h3 style={{ margin: "0 0 12px 0", fontSize: 20 }}>Security</h3>
+              <label style={{ display: "block", marginBottom: 8 }}>New Password</label>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <input
+                  type="password"
+                  placeholder="At least 6 characters"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  style={{
+                    flex: 1,
+                    minWidth: 200,
+                    padding: 12,
+                    borderRadius: 10,
+                    border: `1px solid ${border}`,
+                    background: inputBg,
+                    color: text,
+                    outline: "none",
+                    boxSizing: "border-box",
+                  }}
+                />
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={onUpdatePassword}
+                  style={{
+                    padding: "12px 18px",
+                    borderRadius: 10,
+                    border: "none",
+                    background: "linear-gradient(135deg, #22C55E, #15803D)",
+                    color: "white",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  Update
+                </motion.button>
+              </div>
+              {passwordMessage && (
+                <p style={{ margin: "8px 0 0 0", fontSize: 14, color: passwordMessage.includes("success") ? "#22C55E" : "#F87171" }}>
+                  {passwordMessage}
+                </p>
+              )}
             </div>
           </div>
 
@@ -1154,11 +1206,252 @@ function EventEditorModal({
   );
 }
 
+function MessageComposerModal({
+  open,
+  onClose,
+  darkMode,
+  onSend,
+  isSending,
+  sendError
+}) {
+  const [form, setForm] = useState({ title: "", content: "", targetEmail: "", imageUrl: "" });
+  const [targetType, setTargetType] = useState("all");
+
+  if (!open) return null;
+
+  const panelBg = darkMode ? "#111827" : "white";
+  const text = darkMode ? "#F9FAFB" : "#111827";
+  const muted = darkMode ? "#CBD5E1" : "#6B7280";
+  const border = darkMode ? "#374151" : "#D1D5DB";
+  const inputBg = darkMode ? "#0F172A" : "#F9FAFB";
+
+  async function handleSend() {
+    if (!form.title.trim() || !form.content.trim()) return;
+    await onSend(form, targetType);
+    if (!sendError) {
+      setForm({ title: "", content: "", targetEmail: "", imageUrl: "" });
+      setTargetType("all");
+    }
+  }
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.55)",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          zIndex: 1100,
+          padding: 20,
+        }}
+      >
+        <motion.div
+          initial={{ scale: 0.95, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.95, opacity: 0 }}
+          style={{
+            width: "100%",
+            maxWidth: 620,
+            background: panelBg,
+            color: text,
+            border: `1px solid ${border}`,
+            borderRadius: 24,
+            padding: 24,
+            boxShadow: "0 24px 60px rgba(0,0,0,0.35)",
+            maxHeight: "90vh",
+            overflowY: "auto",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: 28 }}>Send Message</h2>
+              <p style={{ margin: "6px 0 0 0", color: muted }}>
+                Broadcast to everyone or target a specific user.
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              disabled={isSending}
+              style={{
+                border: "none",
+                background: "transparent",
+                color: text,
+                fontSize: 22,
+                cursor: isSending ? "not-allowed" : "pointer",
+                opacity: isSending ? 0.6 : 1,
+              }}
+            >
+              ✕
+            </button>
+          </div>
+
+          <div style={{ display: "grid", gap: 14 }}>
+            <div>
+              <label style={{ display: "block", marginBottom: 8 }}>Target Audience</label>
+              <select
+                value={targetType}
+                onChange={(e) => setTargetType(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: 12,
+                  borderRadius: 12,
+                  border: `1px solid ${border}`,
+                  background: inputBg,
+                  color: text,
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              >
+                <option value="all">Everyone (All Users)</option>
+                <option value="specific">Specific User</option>
+              </select>
+            </div>
+
+            {targetType === "specific" && (
+              <div>
+                <label style={{ display: "block", marginBottom: 8 }}>User Email</label>
+                <input
+                  type="email"
+                  value={form.targetEmail}
+                  onChange={(e) => setForm((prev) => ({ ...prev, targetEmail: e.target.value }))}
+                  placeholder="user@example.com"
+                  style={{
+                    width: "100%",
+                    padding: 12,
+                    borderRadius: 12,
+                    border: `1px solid ${border}`,
+                    background: inputBg,
+                    color: text,
+                    outline: "none",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+            )}
+
+            <div>
+              <label style={{ display: "block", marginBottom: 8 }}>Headline (Title)</label>
+              <input
+                value={form.title}
+                onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+                placeholder="Important community update!"
+                style={{
+                  width: "100%",
+                  padding: 12,
+                  borderRadius: 12,
+                  border: `1px solid ${border}`,
+                  background: inputBg,
+                  color: text,
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: "block", marginBottom: 8 }}>Message Content</label>
+              <textarea
+                value={form.content}
+                onChange={(e) => setForm((prev) => ({ ...prev, content: e.target.value }))}
+                placeholder="Type your message here..."
+                rows={5}
+                style={{
+                  width: "100%",
+                  padding: 12,
+                  borderRadius: 12,
+                  border: `1px solid ${border}`,
+                  background: inputBg,
+                  color: text,
+                  outline: "none",
+                  boxSizing: "border-box",
+                  resize: "vertical",
+                }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: "block", marginBottom: 8 }}>Image URL (Optional)</label>
+              <input
+                type="text"
+                value={form.imageUrl}
+                onChange={(e) => setForm((prev) => ({ ...prev, imageUrl: e.target.value }))}
+                placeholder="https://example.com/image.jpg"
+                style={{
+                  width: "100%",
+                  padding: 12,
+                  borderRadius: 12,
+                  border: `1px solid ${border}`,
+                  background: inputBg,
+                  color: text,
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+            
+            {sendError && (
+              <p style={{ margin: 0, color: "#F87171", fontSize: 14 }}>
+                {sendError}
+              </p>
+            )}
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={onClose}
+              disabled={isSending}
+              style={{
+                padding: "12px 16px",
+                borderRadius: 12,
+                border: `1px solid ${border}`,
+                background: "transparent",
+                color: text,
+                fontWeight: 700,
+                cursor: isSending ? "not-allowed" : "pointer",
+              }}
+            >
+              Cancel
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={handleSend}
+              disabled={isSending || !form.title.trim() || !form.content.trim() || (targetType === "specific" && !form.targetEmail.trim())}
+              style={{
+                padding: "12px 18px",
+                borderRadius: 12,
+                border: "none",
+                background: "linear-gradient(135deg, #3B82F6, #2563EB)",
+                color: "white",
+                fontWeight: 800,
+                cursor: (isSending || !form.title.trim() || !form.content.trim() || (targetType === "specific" && !form.targetEmail.trim())) ? "not-allowed" : "pointer",
+                opacity: (isSending || !form.title.trim() || !form.content.trim() || (targetType === "specific" && !form.targetEmail.trim())) ? 0.7 : 1,
+              }}
+            >
+              {isSending ? "Sending..." : "Send Message"}
+            </motion.button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
 function Dashboard() {
   const [uid, setUid] = useState("");
   const [currentEmail, setCurrentEmail] = useState("");
   const [tasks, setTasks] = useState([]);
   const [events, setEvents] = useState([]);
+  const [inboxMessages, setInboxMessages] = useState([]);
+  const [allUsers, setAllUsers] = useState([]); 
   const [title, setTitle] = useState("");
   const [points, setPoints] = useState(0);
   const [profile, setProfile] = useState(
@@ -1181,6 +1474,9 @@ function Dashboard() {
       email: "",
     })
   );
+  
+  const [newPassword, setNewPassword] = useState("");
+  const [passwordMessage, setPasswordMessage] = useState("");
   const [dismissedCards, setDismissedCards] = useState([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
@@ -1188,22 +1484,37 @@ function Dashboard() {
   const [error, setError] = useState("");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
-  const [isSavingEvent, setIsSavingEvent] = useState(false);
+  
   const [eventModalOpen, setEventModalOpen] = useState(false);
+  const [isSavingEvent, setIsSavingEvent] = useState(false);
   const [editingEventId, setEditingEventId] = useState("");
-  const [eventForm, setEventForm] = useState({
-    title: "",
-    address: "",
-    description: "",
-    date: "",
-  });
+  const [eventForm, setEventForm] = useState({ title: "", address: "", description: "", date: "" });
+
+  const [messageModalOpen, setMessageModalOpen] = useState(false);
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [adminSendError, setAdminSendError] = useState("");
+
+  const [isInboxExpanded, setIsInboxExpanded] = useState(false);
+  const [inboxPage, setInboxPage] = useState(1);
+  const INBOX_ITEMS_PER_PAGE = 3;
+
   const unsubscribeUserDocRef = useRef(null);
   const unsubscribeTasksRef = useRef(null);
   const unsubscribeEventsRef = useRef(null);
+  const unsubscribeMessagesRef = useRef(null);
   const navigate = useNavigate();
 
   const isAdmin = currentEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase();
   const effectiveDarkMode = settingsOpen ? settingsDraft.darkMode : profile.darkMode;
+
+  const totalInboxPages = Math.ceil(inboxMessages.length / INBOX_ITEMS_PER_PAGE);
+  const currentInboxMessages = inboxMessages.slice((inboxPage - 1) * INBOX_ITEMS_PER_PAGE, inboxPage * INBOX_ITEMS_PER_PAGE);
+
+  useEffect(() => {
+    if (inboxPage > totalInboxPages && totalInboxPages > 0) {
+      setInboxPage(totalInboxPages);
+    }
+  }, [inboxMessages.length, inboxPage, totalInboxPages]);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
@@ -1212,10 +1523,12 @@ function Dashboard() {
         setCurrentEmail("");
         setTasks([]);
         setEvents([]);
+        setInboxMessages([]);
         setProfileLoaded(false);
         if (unsubscribeUserDocRef.current) unsubscribeUserDocRef.current();
         if (unsubscribeTasksRef.current) unsubscribeTasksRef.current();
         if (unsubscribeEventsRef.current) unsubscribeEventsRef.current();
+        if (unsubscribeMessagesRef.current) unsubscribeMessagesRef.current();
         navigate("/");
         return;
       }
@@ -1226,6 +1539,7 @@ function Dashboard() {
 
       const userRef = doc(db, "users", user.uid);
       const tasksRef = collection(db, "users", user.uid, "tasks");
+      const messagesRef = collection(db, "users", user.uid, "messages");
       const eventsRef = collection(db, "events");
 
       try {
@@ -1286,16 +1600,26 @@ function Dashboard() {
             arr.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
             setTasks(arr);
             setPoints(total);
-            await setDoc(
-              userRef,
-              {
-                points: total,
-              },
-              { merge: true }
-            );
+            await setDoc(userRef, { points: total }, { merge: true });
           },
           (err) => {
             setError(err.message || "Could not load tasks");
+          }
+        );
+
+        if (unsubscribeMessagesRef.current) unsubscribeMessagesRef.current();
+        unsubscribeMessagesRef.current = onSnapshot(
+          messagesRef,
+          (msgSnap) => {
+            const arr = [];
+            msgSnap.forEach((d) => {
+              arr.push({ id: d.id, ...d.data() });
+            });
+            arr.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+            setInboxMessages(arr);
+          },
+          (err) => {
+            console.error("Could not load messages:", err);
           }
         );
 
@@ -1319,6 +1643,16 @@ function Dashboard() {
             setError(err.message || "Could not load events");
           }
         );
+
+        if (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+          const allUsersSnap = await getDocs(collection(db, "users"));
+          const usersList = [];
+          allUsersSnap.forEach((docSnap) => {
+            usersList.push({ id: docSnap.id, ...docSnap.data() });
+          });
+          setAllUsers(usersList);
+        }
+
       } catch (err) {
         setError(err.message || "Could not load dashboard");
       }
@@ -1329,12 +1663,15 @@ function Dashboard() {
       if (unsubscribeUserDocRef.current) unsubscribeUserDocRef.current();
       if (unsubscribeTasksRef.current) unsubscribeTasksRef.current();
       if (unsubscribeEventsRef.current) unsubscribeEventsRef.current();
+      if (unsubscribeMessagesRef.current) unsubscribeMessagesRef.current();
     };
   }, [navigate, settingsOpen]);
 
   function openSettings() {
     setSettingsDraft(normalizeProfile(profile));
     setSaveStatus("Editing...");
+    setPasswordMessage("");
+    setNewPassword("");
     setSettingsOpen(true);
   }
 
@@ -1373,6 +1710,77 @@ function Dashboard() {
     }
   }
 
+  async function handleUpdatePassword() {
+    if (!newPassword.trim()) {
+      setPasswordMessage("Please enter a new password.");
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPasswordMessage("Password must be at least 6 characters.");
+      return;
+    }
+    
+    setPasswordMessage("Updating...");
+    try {
+      await updatePassword(auth.currentUser, newPassword);
+      setPasswordMessage("Password updated successfully!");
+      setNewPassword("");
+    } catch (err) {
+      if (err.code === "auth/requires-recent-login") {
+        setPasswordMessage("Security block: Please log out and log back in to change your password.");
+      } else {
+        setPasswordMessage(err.message || "Could not update password.");
+      }
+    }
+  }
+
+  async function sendAdminMessage(form, targetType) {
+    if (!isAdmin) return;
+    setIsSendingMessage(true);
+    setAdminSendError("");
+
+    try {
+      let targets = [];
+      if (targetType === "all") {
+        targets = allUsers;
+      } else {
+        targets = allUsers.filter(u => u.email?.toLowerCase() === form.targetEmail.toLowerCase());
+        if (targets.length === 0) {
+          setAdminSendError("No user found with that exact email address.");
+          setIsSendingMessage(false);
+          return;
+        }
+      }
+
+      const sendPromises = targets.map(async (targetUser) => {
+        await addDoc(collection(db, "users", targetUser.id, "messages"), {
+          title: form.title,
+          content: form.content,
+          imageUrl: form.imageUrl || null, // Direct URL link
+          createdAt: Date.now(),
+          sender: currentEmail,
+        });
+      });
+
+      await Promise.all(sendPromises);
+      setMessageModalOpen(false);
+      setAdminSendError("");
+    } catch (err) {
+      setAdminSendError(err.message || "Could not send message.");
+    } finally {
+      setIsSendingMessage(false);
+    }
+  }
+
+  async function deleteMessage(messageId) {
+    if (!uid) return;
+    try {
+      await deleteDoc(doc(db, "users", uid, "messages", messageId));
+    } catch (err) {
+      setError(err.message || "Could not delete message");
+    }
+  }
+
   async function addTask() {
     if (!uid || !title.trim()) return;
     setError("");
@@ -1396,10 +1804,7 @@ function Dashboard() {
     try {
       await setDoc(
         doc(db, "users", uid, "tasks", task.id),
-        {
-          ...task,
-          completed: !task.completed,
-        },
+        { ...task, completed: !task.completed },
         { merge: true }
       );
     } catch (err) {
@@ -1419,18 +1824,10 @@ function Dashboard() {
 
   async function dismissCard(cardId) {
     if (!uid) return;
-    const next = dismissedCards.includes(cardId)
-      ? dismissedCards
-      : [...dismissedCards, cardId];
+    const next = dismissedCards.includes(cardId) ? dismissedCards : [...dismissedCards, cardId];
     setDismissedCards(next);
     try {
-      await setDoc(
-        doc(db, "users", uid),
-        {
-          dismissedCards: next,
-        },
-        { merge: true }
-      );
+      await setDoc(doc(db, "users", uid), { dismissedCards: next }, { merge: true });
     } catch (err) {
       setError(err.message || "Could not save dismissed card");
     }
@@ -1448,12 +1845,7 @@ function Dashboard() {
   }
 
   function resetEventForm() {
-    setEventForm({
-      title: "",
-      address: "",
-      description: "",
-      date: "",
-    });
+    setEventForm({ title: "", address: "", description: "", date: "" });
     setEditingEventId("");
   }
 
@@ -1524,7 +1916,6 @@ function Dashboard() {
     setError("");
     try {
       await deleteDoc(doc(db, "events", event.id));
-
       const usersSnap = await getDocs(collection(db, "users"));
       const deletionPromises = [];
 
@@ -1554,9 +1945,7 @@ function Dashboard() {
     if (!uid) return;
     setError("");
 
-    const alreadyRegistered = tasks.some(
-      (task) => task.type === "event" && task.eventId === event.id
-    );
+    const alreadyRegistered = tasks.some((task) => task.type === "event" && task.eventId === event.id);
 
     if (alreadyRegistered) {
       setError("You already signed up for this event");
@@ -1817,8 +2206,8 @@ function Dashboard() {
           <div
             style={{
               marginTop: 24,
-              background: effectiveDarkMode ? "linear-gradient(135deg, #0F172A, #111827)" : "white",
-              border: `1px solid ${borderColor}`,
+              background: effectiveDarkMode ? "linear-gradient(135deg, #1E1B4B, #0F172A)" : "linear-gradient(135deg, #EFF6FF, #DBEAFE)",
+              border: `1px solid ${effectiveDarkMode ? "#3730A3" : "#BFDBFE"}`,
               borderRadius: 20,
               padding: 20,
               boxShadow: "0 12px 30px rgba(0,0,0,0.08)",
@@ -1826,30 +2215,48 @@ function Dashboard() {
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
               <div>
-                <p style={{ margin: 0, color: "#86EFAC", fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, fontSize: 12 }}>
-                  Admin event center
+                <p style={{ margin: 0, color: effectiveDarkMode ? "#818CF8" : "#2563EB", fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, fontSize: 12 }}>
+                  Admin Control Center
                 </p>
-                <h2 style={{ margin: "8px 0 6px 0" }}>Send events to everyone</h2>
-                <p style={{ margin: 0, color: mutedText }}>
-                  Create, edit, and remove global events from every user dashboard.
+                <h2 style={{ margin: "8px 0 6px 0" }}>Manage Community Hub</h2>
+                <p style={{ margin: 0, color: effectiveDarkMode ? "#C7D2FE" : "#3B82F6" }}>
+                  Create global events or send direct inbox messages to volunteers.
                 </p>
               </div>
-              <motion.button
-                whileHover={{ scale: 1.04 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={openCreateEventModal}
-                style={{
-                  padding: "12px 16px",
-                  borderRadius: 12,
-                  border: "none",
-                  background: "linear-gradient(135deg, #22C55E, #15803D)",
-                  color: "white",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                }}
-              >
-                Create Event
-              </motion.button>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <motion.button
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => setMessageModalOpen(true)}
+                  style={{
+                    padding: "12px 16px",
+                    borderRadius: 12,
+                    border: "none",
+                    background: "linear-gradient(135deg, #3B82F6, #2563EB)",
+                    color: "white",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                  }}
+                >
+                  Message Inbox
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={openCreateEventModal}
+                  style={{
+                    padding: "12px 16px",
+                    borderRadius: 12,
+                    border: "none",
+                    background: "linear-gradient(135deg, #22C55E, #15803D)",
+                    color: "white",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                  }}
+                >
+                  Create Event
+                </motion.button>
+              </div>
             </div>
           </div>
         )}
@@ -1863,149 +2270,155 @@ function Dashboard() {
             alignItems: "start",
           }}
         >
-          <div>
-            <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
-              <input
+          {/* Left Column: Tasks */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+            <div>
+              <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+                <input
+                  style={{
+                    flex: 1,
+                    padding: 12,
+                    borderRadius: 8,
+                    border: `1px solid ${borderColor}`,
+                    background: inputBg,
+                    color: textColor,
+                    outline: "none",
+                  }}
+                  placeholder="Add a task"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                />
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  style={{
+                    padding: 12,
+                    background: "#16A34A",
+                    color: "white",
+                    border: "none",
+                    borderRadius: 8,
+                    cursor: "pointer",
+                  }}
+                  onClick={addTask}
+                >
+                  Add
+                </motion.button>
+              </div>
+
+              <div
                 style={{
-                  flex: 1,
-                  padding: 12,
-                  borderRadius: 8,
+                  background: cardBg,
                   border: `1px solid ${borderColor}`,
-                  background: inputBg,
-                  color: textColor,
-                  outline: "none",
+                  borderRadius: 18,
+                  padding: 18,
                 }}
-                placeholder="Add a task"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-              />
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                style={{
-                  padding: 12,
-                  background: "#16A34A",
-                  color: "white",
-                  border: "none",
-                  borderRadius: 8,
-                  cursor: "pointer",
-                }}
-                onClick={addTask}
               >
-                Add
-              </motion.button>
-            </div>
-
-            <div
-              style={{
-                background: cardBg,
-                border: `1px solid ${borderColor}`,
-                borderRadius: 18,
-                padding: 18,
-              }}
-            >
-              <h2 style={{ marginTop: 0, marginBottom: 14 }}>Tasks</h2>
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                <AnimatePresence>
-                  {tasks.length === 0 && (
-                    <div
-                      style={{
-                        padding: 16,
-                        borderRadius: 12,
-                        background: softBg,
-                        color: mutedText,
-                      }}
-                    >
-                      No tasks yet. Add one or sign up for an event.
-                    </div>
-                  )}
-
-                  {tasks.map((task) => {
-                    const isEvent = task.type === "event";
-                    const liveEvent = isEvent ? events.find((e) => e.id === task.eventId) : null;
-                    
-                    const displayTitle = liveEvent ? `Attend: ${liveEvent.title}` : task.title;
-                    const displayDate = liveEvent ? liveEvent.date : task.eventDate;
-
-                    return (
-                      <motion.div
-                        key={task.id}
-                        initial={{ opacity: 0, x: -50 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: 50 }}
-                        transition={{ duration: 0.3 }}
+                <h2 style={{ marginTop: 0, marginBottom: 14 }}>Tasks</h2>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <AnimatePresence>
+                    {tasks.length === 0 && (
+                      <div
                         style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          padding: 12,
+                          padding: 16,
                           borderRadius: 12,
-                          background: effectiveDarkMode ? "#0F172A" : "#FAFAFA",
-                          border: `1px solid ${borderColor}`,
-                          gap: 12,
+                          background: softBg,
+                          color: mutedText,
                         }}
                       >
-                        <div>
-                          <span
-                            style={{
-                              display: "block",
-                              textDecoration: task.completed ? "line-through" : "none",
-                              color: textColor,
-                              fontWeight: 700,
-                            }}
-                          >
-                            {displayTitle}
-                          </span>
-                          <span style={{ fontSize: 13, color: mutedText }}>
-                            Reward: {task.reward} points
-                          </span>
-                          {isEvent && displayDate && (
-                            <div style={{ marginTop: 6, fontSize: 13, color: "#86EFAC" }}>
-                              Event signup • {formatEventDate(displayDate)}
-                            </div>
-                          )}
-                        </div>
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                          <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            style={{
-                              padding: "6px 10px",
-                              background: "#15803D",
-                              color: "white",
-                              border: "none",
-                              borderRadius: 6,
-                              cursor: "pointer",
-                            }}
-                            onClick={() => toggleComplete(task)}
-                          >
-                            {task.completed ? "Undo" : "Done"}
-                          </motion.button>
-                          <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            style={{
-                              padding: "6px 10px",
-                              background: softBg,
-                              color: textColor,
-                              border: `1px solid ${borderColor}`,
-                              borderRadius: 6,
-                              cursor: "pointer",
-                            }}
-                            onClick={() => removeTask(task)}
-                          >
-                            ✕
-                          </motion.button>
-                        </div>
-                      </motion.div>
-                    );
-                  })}
-                </AnimatePresence>
+                        No tasks yet. Add one or sign up for an event.
+                      </div>
+                    )}
+
+                    {tasks.map((task) => {
+                      const isEvent = task.type === "event";
+                      const liveEvent = isEvent ? events.find((e) => e.id === task.eventId) : null;
+                      
+                      const displayTitle = liveEvent ? `Attend: ${liveEvent.title}` : task.title;
+                      const displayDate = liveEvent ? liveEvent.date : task.eventDate;
+
+                      return (
+                        <motion.div
+                          key={task.id}
+                          initial={{ opacity: 0, x: -50 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: 50 }}
+                          transition={{ duration: 0.3 }}
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            padding: 12,
+                            borderRadius: 12,
+                            background: effectiveDarkMode ? "#0F172A" : "#FAFAFA",
+                            border: `1px solid ${borderColor}`,
+                            gap: 12,
+                          }}
+                        >
+                          <div>
+                            <span
+                              style={{
+                                display: "block",
+                                textDecoration: task.completed ? "line-through" : "none",
+                                color: textColor,
+                                fontWeight: 700,
+                              }}
+                            >
+                              {displayTitle}
+                            </span>
+                            <span style={{ fontSize: 13, color: mutedText }}>
+                              Reward: {task.reward} points
+                            </span>
+                            {isEvent && displayDate && (
+                              <div style={{ marginTop: 6, fontSize: 13, color: "#86EFAC" }}>
+                                Event signup • {formatEventDate(displayDate)}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              style={{
+                                padding: "6px 10px",
+                                background: "#15803D",
+                                color: "white",
+                                border: "none",
+                                borderRadius: 6,
+                                cursor: "pointer",
+                              }}
+                              onClick={() => toggleComplete(task)}
+                            >
+                              {task.completed ? "Undo" : "Done"}
+                            </motion.button>
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              style={{
+                                padding: "6px 10px",
+                                background: softBg,
+                                color: textColor,
+                                border: `1px solid ${borderColor}`,
+                                borderRadius: 6,
+                                cursor: "pointer",
+                              }}
+                              onClick={() => removeTask(task)}
+                            >
+                              ✕
+                            </motion.button>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </AnimatePresence>
+                </div>
               </div>
             </div>
           </div>
 
-          <div>
+          {/* Right Column: Events & Inbox */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+            
+            {/* EVENTS SECTION */}
             <div
               style={{
                 background: cardBg,
@@ -2135,6 +2548,147 @@ function Dashboard() {
                 })}
               </div>
             </div>
+
+            {/* INBOX SECTION */}
+            <div
+              style={{
+                background: effectiveDarkMode ? "linear-gradient(135deg, #1E293B, #0F172A)" : "#F0FDF4",
+                border: `1px solid ${effectiveDarkMode ? "#334155" : "#BBF7D0"}`,
+                borderRadius: 18,
+                padding: 18,
+              }}
+            >
+              <div 
+                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", userSelect: "none" }}
+                onClick={() => setIsInboxExpanded(!isInboxExpanded)}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 24 }}>📥</span>
+                  <h2 style={{ margin: 0 }}>Inbox</h2>
+                  {inboxMessages.length > 0 && (
+                    <div style={{ 
+                      background: "#EF4444", 
+                      color: "white", 
+                      borderRadius: 999, 
+                      padding: "2px 8px", 
+                      fontSize: 12, 
+                      fontWeight: "bold" 
+                    }}>
+                      {inboxMessages.length} Message{inboxMessages.length > 1 ? 's' : ''}
+                    </div>
+                  )}
+                </div>
+                <div style={{ fontSize: 20, color: mutedText }}>
+                  {isInboxExpanded ? "▲" : "▼"}
+                </div>
+              </div>
+
+              {isInboxExpanded && (
+                <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 12 }}>
+                  {inboxMessages.length === 0 ? (
+                    <div style={{ color: mutedText }}>Your inbox is empty.</div>
+                  ) : (
+                    <>
+                      <AnimatePresence mode="popLayout">
+                        {currentInboxMessages.map((msg) => (
+                          <motion.div
+                            key={msg.id}
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            transition={{ duration: 0.2 }}
+                            style={{
+                              background: cardBg,
+                              border: `1px solid ${borderColor}`,
+                              borderRadius: 12,
+                              padding: 16,
+                              position: "relative",
+                            }}
+                          >
+                            <button
+                              onClick={() => deleteMessage(msg.id)}
+                              style={{
+                                position: "absolute",
+                                top: 12,
+                                right: 12,
+                                background: "transparent",
+                                border: "none",
+                                color: mutedText,
+                                cursor: "pointer",
+                                fontSize: 16,
+                              }}
+                              title="Clear message"
+                            >
+                              ✕
+                            </button>
+                            <h3 style={{ margin: "0 0 8px 0", paddingRight: 20, fontSize: 18 }}>{msg.title}</h3>
+                            <p style={{ margin: "0 0 10px 0", color: mutedText, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+                              {msg.content}
+                            </p>
+                            {msg.imageUrl && (
+                              <img 
+                                src={msg.imageUrl} 
+                                alt="Attachment" 
+                                style={{ maxWidth: "100%", borderRadius: 8, marginTop: 8 }}
+                              />
+                            )}
+                            <div style={{ marginTop: 10, fontSize: 12, color: mutedText }}>
+                              Received: {new Date(msg.createdAt).toLocaleString()}
+                            </div>
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+
+                      {/* Pagination Controls */}
+                      {totalInboxPages > 1 && (
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => setInboxPage(p => Math.max(1, p - 1))}
+                            disabled={inboxPage === 1}
+                            style={{
+                              padding: "6px 12px",
+                              background: softBg,
+                              color: textColor,
+                              border: `1px solid ${borderColor}`,
+                              borderRadius: 8,
+                              cursor: inboxPage === 1 ? "not-allowed" : "pointer",
+                              opacity: inboxPage === 1 ? 0.5 : 1
+                            }}
+                          >
+                            Prev
+                          </motion.button>
+                          
+                          <span style={{ fontSize: 14, color: mutedText }}>
+                            Page {inboxPage} of {totalInboxPages}
+                          </span>
+
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => setInboxPage(p => Math.min(totalInboxPages, p + 1))}
+                            disabled={inboxPage === totalInboxPages}
+                            style={{
+                              padding: "6px 12px",
+                              background: softBg,
+                              color: textColor,
+                              border: `1px solid ${borderColor}`,
+                              borderRadius: 8,
+                              cursor: inboxPage === totalInboxPages ? "not-allowed" : "pointer",
+                              opacity: inboxPage === totalInboxPages ? 0.5 : 1
+                            }}
+                          >
+                            Next
+                          </motion.button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+            
           </div>
         </div>
       </div>
@@ -2147,6 +2701,10 @@ function Dashboard() {
         saveStatus={saveStatus}
         darkMode={effectiveDarkMode}
         isSavingSettings={isSavingSettings}
+        newPassword={newPassword}
+        setNewPassword={setNewPassword}
+        onUpdatePassword={handleUpdatePassword}
+        passwordMessage={passwordMessage}
       />
 
       <EventEditorModal
@@ -2158,6 +2716,15 @@ function Dashboard() {
         isSaving={isSavingEvent}
         darkMode={effectiveDarkMode}
         isEditing={!!editingEventId}
+      />
+
+      <MessageComposerModal
+        open={messageModalOpen}
+        onClose={() => setMessageModalOpen(false)}
+        darkMode={effectiveDarkMode}
+        onSend={sendAdminMessage}
+        isSending={isSendingMessage}
+        sendError={adminSendError}
       />
     </div>
   );
